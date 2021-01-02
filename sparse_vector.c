@@ -16,15 +16,11 @@ PG_MODULE_MAGIC;
 /*
 ** Input/Output
 */
-PG_FUNCTION_INFO_V1(sparse_pair_in);
-PG_FUNCTION_INFO_V1(sparse_pair_out);
-PG_FUNCTION_INFO_V1(sparse_pair_recv);
-PG_FUNCTION_INFO_V1(sparse_pair_send);
-
 PG_FUNCTION_INFO_V1(sparse_vector_in);
 PG_FUNCTION_INFO_V1(sparse_vector_out);
 
 PG_FUNCTION_INFO_V1(sparse_vector_a_f4);
+PG_FUNCTION_INFO_V1(sparse_vector_dot_product);
 
 
 /*
@@ -34,27 +30,6 @@ char* sparse_pair_to_str(SparsePair *sparse_pair);
 static void insert_sparse_pair(SparsePair *sp, int i, float x);
 
 
-Datum
-sparse_pair_in(PG_FUNCTION_ARGS)
-{
-    char       *str = PG_GETARG_CSTRING(0);
-    int         i;
-    float       x;
-    SparsePair *result;
-
-    if (sscanf(str, " ( %d , %f )", &i, &x) != 2)
-        ereport(
-            ERROR,
-            (errcode(ERRCODE_INVALID_TEXT_REPRESENTATION), errmsg("invalid input syntax for sparse pair: \"%s\"", str))
-        );
-
-    result = (SparsePair *) palloc(sizeof(SparsePair));
-    result->i = i;
-    result->x = x;
-
-    PG_RETURN_POINTER(result);
-}
-
 char* sparse_pair_to_str(SparsePair *sparse_pair)
 {
     char *res;
@@ -62,42 +37,6 @@ char* sparse_pair_to_str(SparsePair *sparse_pair)
     res = (char *) palloc(100);
     snprintf(res, 100, "(%d, %f)", sparse_pair->i, sparse_pair->x);
     return res;
-}
-
-Datum
-sparse_pair_out(PG_FUNCTION_ARGS)
-{
-    SparsePair *sparse_pair = (SparsePair *) PG_GETARG_POINTER(0);
-    char       *res = sparse_pair_to_str(sparse_pair);
-
-    PG_RETURN_CSTRING(res);
-}
-
-
-Datum
-sparse_pair_recv(PG_FUNCTION_ARGS)
-{
-    StringInfo  buf = (StringInfo) PG_GETARG_POINTER(0);
-    SparsePair *result;
-
-    result = (SparsePair *) palloc(sizeof(SparsePair));
-    result->i = pq_getmsgint64(buf);
-    result->x = pq_getmsgfloat4(buf);
-
-    PG_RETURN_POINTER(result);
-}
-
-
-Datum
-sparse_pair_send(PG_FUNCTION_ARGS)
-{
-    SparsePair    *sparse_pair = (SparsePair *) PG_GETARG_POINTER(0);
-    StringInfoData buf;
-
-    pq_begintypsend(&buf);
-    pq_sendint64(&buf, sparse_pair->i);
-    pq_sendfloat4(&buf, sparse_pair->x);
-    PG_RETURN_BYTEA_P(pq_endtypsend(&buf));
 }
 
 static void insert_sparse_pair(SparsePair *sp, int i, float x)
@@ -170,8 +109,40 @@ Datum
 sparse_vector_in(PG_FUNCTION_ARGS)
 {
     // not implemented; you have to use sparse_vector_a_f4 to get sparse_vector
+    ereport(ERROR,
+        (errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
+         errmsg("not implemented; use sparse_vector(ARRAY[])")));
 
-    char         *str = PG_GETARG_CSTRING(0);
     SparseVector *res = NULL;
     PG_RETURN_SPARSE_VECTOR_P(res);
+}
+
+
+Datum
+sparse_vector_dot_product(PG_FUNCTION_ARGS)
+{
+    SparseVector  *a = PG_GETARG_SPARSE_VECTOR_P(0),
+                  *b = PG_GETARG_SPARSE_VECTOR_P(1);
+
+    float           res = 0.0;
+    int             k = 0,
+                    j = 0,
+                    size_a = SIZE(a),
+                    size_b = SIZE(b);
+
+    while (k < size_a && j < size_b)
+    {
+        if (a->x[k].i > b->x[j].i) {
+            j++;
+        } else if (a->x[k].i < b->x[j].i) {
+            k++;
+        }
+        else {
+            res += (a->x[k].x * b->x[j].x);
+            j++;
+            k++;
+        }
+    }
+
+    PG_RETURN_FLOAT4(res);
 }

@@ -1,0 +1,4 @@
+# cube extension
+comment = 'data type for sparse vector'
+default_version = '0.1'
+module_pathname = '$libdir/sparse_vector'

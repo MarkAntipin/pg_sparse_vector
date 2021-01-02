@@ -3,37 +3,15 @@
 
 #include "fmgr.h"
 #include "libpq/pqformat.h"
+#include "sparse_vector.h"
 #include "utils/array.h"
 #include "utils/float.h"
 
 PG_MODULE_MAGIC;
 
-typedef struct SparsePair
-{
-    int   i;
-    float x;
-} SparsePair;
-
-
-typedef struct SparseVector
-{
-    int32        vl_len_;
-    int          size;
-    SparsePair   x[FLEXIBLE_ARRAY_MEMBER];
-} SparseVector;
-
 // macros for postgres array
 #define ARRNELEMS(x)  ArrayGetNItems(ARR_NDIM(x), ARR_DIMS(x))
 #define ARRPTR(x)  ( (float *) ARR_DATA_PTR(x) )
-
-// sparse_vector access macros
-#define SET_SIZE(sparse_vector, _size) ( (sparse_vector)->size = _size )
-#define SIZE(sparse_vector)           ( (sparse_vector)->size )
-
-#define DatumGetSparseVector(x)   ((SparseVector *) PG_DETOAST_DATUM(x))
-#define PG_GETARG_SPARSE_VECTOR_P(x)    DatumGetSparseVector(PG_GETARG_DATUM(x))
-#define PG_RETURN_SPARSE_VECTOR_P(x)    PG_RETURN_POINTER(x)
-#define SPARSE_VECTOR_SIZE(array_size)    (offsetof(SparseVector, x) + sizeof(SparsePair)*(array_size))
 
 /*
 ** Input/Output
@@ -193,7 +171,7 @@ sparse_vector_in(PG_FUNCTION_ARGS)
 {
     // not implemented; you have to use sparse_vector_a_f4 to get sparse_vector
 
-    char       *str = PG_GETARG_CSTRING(0);
-    SparseVector      *res;
+    char         *str = PG_GETARG_CSTRING(0);
+    SparseVector *res = NULL;
     PG_RETURN_SPARSE_VECTOR_P(res);
 }

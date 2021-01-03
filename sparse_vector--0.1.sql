@@ -29,3 +29,7 @@ LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;
 CREATE FUNCTION dot_product(sparse_vector, sparse_vector) RETURNS float4
 AS 'MODULE_PATHNAME', 'sparse_vector_dot_product'
 LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;
+
+CREATE FUNCTION cosine_similarity(sparse_vector, sparse_vector) RETURNS float4
+AS 'MODULE_PATHNAME', 'sparse_vector_cosine_similarity'
+LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;

@@ -1,6 +1,7 @@
 #include <stdio.h>
-#include "postgres.h"
+#include <math.h>
 
+#include "postgres.h"
 #include "fmgr.h"
 #include "libpq/pqformat.h"
 #include "sparse_vector.h"
@@ -21,16 +22,18 @@ PG_FUNCTION_INFO_V1(sparse_vector_out);
 
 PG_FUNCTION_INFO_V1(sparse_vector_a_f4);
 PG_FUNCTION_INFO_V1(sparse_vector_dot_product);
-
+PG_FUNCTION_INFO_V1(sparse_vector_cosine_similarity);
 
 /*
 ** Internal functions
 */
-char* sparse_pair_to_str(SparsePair *sparse_pair);
-static void insert_sparse_pair(SparsePair *sp, int i, float x);
+char* _sparse_pair_to_str(SparsePair *sparse_pair);
+static void _insert_sparse_pair(SparsePair *sp, int i, float x);
+float _sparse_vector_norm(SparseVector *sparse_vector);
+float _sparse_vector_dot_product(SparseVector *a, SparseVector *b);
 
-
-char* sparse_pair_to_str(SparsePair *sparse_pair)
+char*
+_sparse_pair_to_str(SparsePair *sparse_pair)
 {
     char *res;
 
@@ -39,7 +42,8 @@ char* sparse_pair_to_str(SparsePair *sparse_pair)
     return res;
 }
 
-static void insert_sparse_pair(SparsePair *sp, int i, float x)
+static void
+_insert_sparse_pair(SparsePair *sp, int i, float x)
 {
     sp->i = i;
     sp->x = x;
@@ -70,7 +74,7 @@ sparse_vector_a_f4(PG_FUNCTION_ARGS)
         if (da[k] == 0)
             continue;
 
-        insert_sparse_pair(&res->x[j], k, da[k]);
+        _insert_sparse_pair(&res->x[j], k, da[k]);
         j++;
     }
     SET_SIZE(res, j);
@@ -95,7 +99,7 @@ sparse_vector_out(PG_FUNCTION_ARGS)
         if (i > 0)
             appendStringInfoString(&buf, ", ");
 
-        char* sparse_pair_str = sparse_pair_to_str(&sparse_vector->x[i]);
+        char* sparse_pair_str = _sparse_pair_to_str(&sparse_vector->x[i]);
         appendStringInfoString(&buf, sparse_pair_str);
 
     }
@@ -117,13 +121,23 @@ sparse_vector_in(PG_FUNCTION_ARGS)
     PG_RETURN_SPARSE_VECTOR_P(res);
 }
 
-
-Datum
-sparse_vector_dot_product(PG_FUNCTION_ARGS)
+float
+_sparse_vector_norm(SparseVector *sparse_vector)
 {
-    SparseVector  *a = PG_GETARG_SPARSE_VECTOR_P(0),
-                  *b = PG_GETARG_SPARSE_VECTOR_P(1);
+    int   i;
+    int   size = SIZE(sparse_vector);
+    float res = 0.0;
 
+    for (i = 0; i < size; i++)
+    {
+        res += (sparse_vector->x[i].x * sparse_vector->x[i].x);
+    }
+    return sqrt(res);
+}
+
+float
+_sparse_vector_dot_product(SparseVector *a, SparseVector *b)
+{
     float           res = 0.0;
     int             k = 0,
                     j = 0,
@@ -143,6 +157,30 @@ sparse_vector_dot_product(PG_FUNCTION_ARGS)
             k++;
         }
     }
+
+    return res;
+}
+
+
+Datum
+sparse_vector_dot_product(PG_FUNCTION_ARGS)
+{
+    SparseVector  *a = PG_GETARG_SPARSE_VECTOR_P(0),
+                  *b = PG_GETARG_SPARSE_VECTOR_P(1);
+
+    float          res = _sparse_vector_dot_product(a, b);
+
+    PG_RETURN_FLOAT4(res);
+}
+
+Datum
+sparse_vector_cosine_similarity(PG_FUNCTION_ARGS)
+{
+    SparseVector  *a = PG_GETARG_SPARSE_VECTOR_P(0),
+                  *b = PG_GETARG_SPARSE_VECTOR_P(1);
+
+    float          res = _sparse_vector_dot_product(a, b) /
+        (_sparse_vector_norm(a) * _sparse_vector_norm(b));
 
     PG_RETURN_FLOAT4(res);
 }

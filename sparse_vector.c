@@ -21,6 +21,7 @@ PG_FUNCTION_INFO_V1(sparse_vector_in);
 PG_FUNCTION_INFO_V1(sparse_vector_out);
 
 PG_FUNCTION_INFO_V1(sparse_vector_a_f4);
+PG_FUNCTION_INFO_V1(sparse_vector_a_f4_norm);
 PG_FUNCTION_INFO_V1(sparse_vector_dot_product);
 PG_FUNCTION_INFO_V1(sparse_vector_cosine_similarity);
 
@@ -30,6 +31,8 @@ PG_FUNCTION_INFO_V1(sparse_vector_cosine_similarity);
 char* _sparse_pair_to_str(SparsePair *sparse_pair);
 static void _insert_sparse_pair(SparsePair *sp, int i, float x);
 float _sparse_vector_norm(SparseVector *sparse_vector);
+float _array_norm(float *a, int array_size);
+SparseVector* _sparse_vector_from_array(ArrayType *a, bool is_norm);
 float _sparse_vector_dot_product(SparseVector *a, SparseVector *b);
 
 char*
@@ -49,35 +52,73 @@ _insert_sparse_pair(SparsePair *sp, int i, float x)
     sp->x = x;
 }
 
-Datum
-sparse_vector_a_f4(PG_FUNCTION_ARGS)
+float
+_array_norm(float *a, int array_size)
 {
-    ArrayType    *a = PG_GETARG_ARRAYTYPE_P(0);
-    SparseVector *res;
+    int   i;
+    float res = 0.0;
 
+    for (i = 0; i < array_size; i++)
+    {
+        res += (a[i] * a[i]);
+    }
+    return sqrt(res);
+}
+
+SparseVector*
+_sparse_vector_from_array(ArrayType *a, bool normalize)
+{
+    SparseVector *res;
     int           k,
                   j,
                   array_size,
                   size;
-
+    float         norm,
+                  sp_value;
     float        *da;
 
     j = 0;
+    norm = 1;
     array_size = ARRNELEMS(a);
     da = ARRPTR(a);
     size = SPARSE_VECTOR_SIZE(array_size);
     res = (SparseVector *) palloc0(size);
     SET_VARSIZE(res, size);
 
+    if (normalize)
+        norm = _array_norm(da, array_size);
+
     for (k = 0; k < array_size; k++)
     {
         if (da[k] == 0)
             continue;
 
-        _insert_sparse_pair(&res->x[j], k, da[k]);
+        if (normalize)
+            sp_value = da[k] / norm;
+        else
+            sp_value = da[k];
+
+        _insert_sparse_pair(&res->x[j], k, sp_value);
         j++;
     }
     SET_SIZE(res, j);
+    return res;
+}
+
+Datum
+sparse_vector_a_f4(PG_FUNCTION_ARGS)
+{
+    ArrayType    *a = PG_GETARG_ARRAYTYPE_P(0);
+    SparseVector *res = _sparse_vector_from_array(a, false);
+
+    PG_RETURN_SPARSE_VECTOR_P(res);
+}
+
+Datum
+sparse_vector_a_f4_norm(PG_FUNCTION_ARGS)
+{
+    ArrayType    *a = PG_GETARG_ARRAYTYPE_P(0);
+    SparseVector *res = _sparse_vector_from_array(a, true);
 
     PG_RETURN_SPARSE_VECTOR_P(res);
 }

@@ -26,6 +26,10 @@ CREATE FUNCTION sparse_vector(float4[]) RETURNS sparse_vector
 AS 'MODULE_PATHNAME', 'sparse_vector_a_f4'
 LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;
 
+CREATE FUNCTION sparse_vector_norm(float4[]) RETURNS sparse_vector
+AS 'MODULE_PATHNAME', 'sparse_vector_a_f4_norm'
+LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;
+
 CREATE FUNCTION dot_product(sparse_vector, sparse_vector) RETURNS float4
 AS 'MODULE_PATHNAME', 'sparse_vector_dot_product'
 LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;
